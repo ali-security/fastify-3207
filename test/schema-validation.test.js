@@ -1149,3 +1149,200 @@ test('Custom validator builder override by custom validator compiler in child in
   })
   t.equal(two.statusCode, 200)
 })
+
+test('Schema validation will not be bypass by different content type', async t => {
+  t.plan(54)
+  const fastify = Fastify()
+
+  fastify.post('/', {
+    schema: {
+      body: {
+        type: 'object',
+        properties: {
+          foo: { type: 'string' }
+        },
+        required: ['foo']
+      }
+    }
+  }, (req, reply) => {
+    reply.code(200).send({ ok: 'ok' })
+  })
+
+  await fastify.listen({ port: 0 })
+  t.teardown(() => fastify.close())
+  const address = `http://localhost:${fastify.server.address().port}`
+
+  let found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({ foo: 'string' })
+  })
+  t.equal(found.status, 200)
+  await found.arrayBuffer()
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json; charset=utf-8'
+    },
+    body: JSON.stringify({ foo: 'string' })
+  })
+  t.equal(found.status, 200)
+  await found.arrayBuffer()
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': '   application/json   '
+    },
+    body: JSON.stringify({ foo: 'string' })
+  })
+  t.equal(found.status, 200)
+  await found.arrayBuffer()
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 400)
+  t.equal((await found.json()).code, 'FST_ERR_VALIDATION')
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json; charset=utf-8'
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 400)
+  t.equal((await found.json()).code, 'FST_ERR_VALIDATION')
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': '   application/json   '
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 400)
+  t.equal((await found.json()).code, 'FST_ERR_VALIDATION')
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json\ta'
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 415)
+  t.equal((await found.json()).code, 'FST_ERR_CTP_INVALID_MEDIA_TYPE')
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json\tx'
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 415)
+  t.equal((await found.json()).code, 'FST_ERR_CTP_INVALID_MEDIA_TYPE')
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json\ta; charset=utf-8'
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 415)
+  t.equal((await found.json()).code, 'FST_ERR_CTP_INVALID_MEDIA_TYPE')
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/ json'
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 415)
+  t.equal((await found.json()).code, 'FST_ERR_CTP_INVALID_MEDIA_TYPE')
+
+  // Test with spaces and tabs in various positions
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json '
+    },
+    body: JSON.stringify({ foo: 'string' })
+  })
+  t.equal(found.status, 200)
+  await found.arrayBuffer()
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': ' application/json'
+    },
+    body: JSON.stringify({ foo: 'string' })
+  })
+  t.equal(found.status, 200)
+  await found.arrayBuffer()
+
+  // Test invalid content types
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'invalid'
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 415)
+  t.equal((await found.json()).code, 'FST_ERR_CTP_INVALID_MEDIA_TYPE')
+
+  // Test with uppercase variations
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'ApPlIcAtIoN/JsOn'
+    },
+    body: JSON.stringify({ foo: 'string' })
+  })
+  t.equal(found.status, 200)
+  await found.arrayBuffer()
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'ApPlIcAtIoN/JsOn; charset=utf-8'
+    },
+    body: JSON.stringify({ foo: 'string' })
+  })
+  t.equal(found.status, 200)
+  await found.arrayBuffer()
+
+  // Test that validation still works properly
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'ApPlIcAtIoN/JsOn'
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 400)
+  t.equal((await found.json()).code, 'FST_ERR_VALIDATION')
+
+  found = await fetch(address, {
+    method: 'POST',
+    headers: {
+      'content-type': 'ApPlIcAtIoN/JsOn; charset=utf-8'
+    },
+    body: JSON.stringify({ invalid: 'string' })
+  })
+  t.equal(found.status, 400)
+  t.equal((await found.json()).code, 'FST_ERR_VALIDATION')
+})

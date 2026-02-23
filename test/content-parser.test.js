@@ -175,7 +175,7 @@ test('add', t => {
     const fastify = Fastify()
     const contentTypeParser = fastify[keys.kContentTypeParser]
 
-    t.error(contentTypeParser.add('test', {}, first))
+    t.error(contentTypeParser.add('test/type', {}, first))
     t.error(contentTypeParser.add(/test/, {}, first))
     t.throws(
       () => contentTypeParser.add({}, {}, first),
@@ -716,37 +716,17 @@ test('allow partial content-type - not essence check', async t => {
   })
 })
 
-test('edge case content-type - ;', async t => {
+test('content-type fail when not a valid type', async t => {
   t.plan(1)
 
   const fastify = Fastify()
   fastify.removeAllContentTypeParsers()
-  fastify.addContentTypeParser(';', function (request, body, done) {
-    t.fail('should not be called')
-    done(null, body)
-  })
-
-  fastify.post('/', async () => {
-    return 'ok'
-  })
-
-  await fastify.inject({
-    method: 'POST',
-    path: '/',
-    headers: {
-      'content-type': 'application/json; foo=bar; charset=utf8'
-    },
-    body: ''
-  })
-
-  await fastify.inject({
-    method: 'POST',
-    path: '/',
-    headers: {
-      'content-type': 'image/jpeg'
-    },
-    body: ''
-  })
-
-  t.pass('end')
+  try {
+    fastify.addContentTypeParser('type-only', function (request, body, done) {
+      t.fail('shouldn\'t be called')
+      done(null, body)
+    })
+  } catch (error) {
+    t.equal(error.message, 'The content type should be a string or a RegExp')
+  }
 })
