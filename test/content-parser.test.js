@@ -516,7 +516,7 @@ test('content-type match parameters - string 2', async t => {
     method: 'POST',
     path: '/',
     headers: {
-      'content-type': 'application/json; foo=bar; charset=utf8'
+      'content-type': 'application/json; charset=utf8; foo=bar'
     },
     body: ''
   })
