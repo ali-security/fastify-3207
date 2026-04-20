@@ -672,7 +672,7 @@ test('allow partial content-type - essence check', async t => {
 
   const fastify = Fastify()
   fastify.removeAllContentTypeParsers()
-  fastify.addContentTypeParser('json', function (request, body, done) {
+  fastify.addContentTypeParser('application/json', function (request, body, done) {
     t.pass('should be called')
     done(null, body)
   })
